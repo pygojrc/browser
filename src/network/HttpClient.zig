@@ -4326,6 +4326,11 @@ pub const Transfer = struct {
     }
 
     fn putHeader(self: *Transfer, name: []const u8, value: []const u8, source: HeaderSource, mode: enum { set, append }) !void {
+        // Chromium ignores User-Agent set by page scripts; CLI and CDP
+        // overrides remain available to the browser operator.
+        if (source == .author and std.ascii.eqlIgnoreCase(name, "user-agent")) {
+            return;
+        }
         if (verifyHeader(name, value) == false) {
             return;
         }
@@ -5702,11 +5707,17 @@ test "HttpClient: Transfer header layering" {
     try testing.expectEqual("\"Lightpanda\";v=\"1\"", transfer.findRequestHeader("sec-ch-ua").?);
 
     // an invalid User-Agent never enters the list
-    try transfer.setHeader("user-agent", "Mozilla/5.0", .{ .source = .author });
+    try transfer.setHeader("user-agent", "Mozilla/5.0\x01", .{ .source = .cdp });
     try testing.expectEqual("Lightpanda/1.0", transfer.findRequestHeader("user-agent").?);
 
-    // a valid author User-Agent replaces the default
-    try transfer.setHeader("User-Agent", "MyBot/2.0", .{ .source = .author });
+    // Page scripts cannot override the UA, but CDP can.
+    try transfer.setHeader("user-agent", "Mozilla/5.0", .{ .source = .author });
+    try testing.expectEqual("Lightpanda/1.0", transfer.findRequestHeader("user-agent").?);
+    try transfer.setHeader("user-agent", "Mozilla/5.0", .{ .source = .cdp });
+    try testing.expectEqual("Mozilla/5.0", transfer.findRequestHeader("user-agent").?);
+
+    // a valid CDP User-Agent replaces the previous override
+    try transfer.setHeader("User-Agent", "MyBot/2.0", .{ .source = .cdp });
     try testing.expectEqual("MyBot/2.0", transfer.findRequestHeader("user-agent").?);
 }
 

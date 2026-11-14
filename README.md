@@ -303,6 +303,8 @@ lightpanda completion zsh > ~/.zfunc/_lightpanda  # with fpath=(~/.zfunc $fpath)
 
 This pygojrc fork disables upstream usage and crash telemetry in all builds. It does not create or read the upstream telemetry instance ID. Existing IDs are left untouched. Local logs and metrics remain available.
 
+The `--user-agent` option and CDP user-agent override accept printable ASCII, including Mozilla-style user agents. They currently do not update Client Hints or the emulated platform, so a custom user agent can be inconsistent with those values. Page scripts cannot override the browser's User-Agent request header.
+
 ### Core dumps
 
 Set `LIGHTPANDA_DISABLE_CORE_DUMP` (to any value) to suppress crash core dumps by zeroing the soft `RLIMIT_CORE` at startup.

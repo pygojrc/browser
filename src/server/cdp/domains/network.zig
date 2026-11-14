@@ -898,9 +898,7 @@ test "cdp.network setExtraHTTPHeaders rejects non-printable User-Agent" {
     try testing.expectEqual("hi", target.extra_headers.items[0].value);
 }
 
-test "cdp.network setExtraHTTPHeaders rejects a Mozilla User-Agent" {
-    testing.silenceLog(&.{.cdp});
-
+test "cdp.network setExtraHTTPHeaders accepts a Mozilla User-Agent" {
     var ctx = try testing.context();
     defer ctx.deinit();
 
@@ -913,7 +911,9 @@ test "cdp.network setExtraHTTPHeaders rejects a Mozilla User-Agent" {
     });
 
     const bc = &ctx.cdp().browser_context.?;
-    try testing.expectEqual((try testing.firstTarget(bc)).extra_headers.items.len, 0);
+    const headers = (try testing.firstTarget(bc)).extra_headers.items;
+    try testing.expectEqual(headers.len, 1);
+    try testing.expectEqual("Mozilla/5.0", headers[0].value);
 }
 
 test "cdp.network setExtraHTTPHeaders accepts valid User-Agent" {

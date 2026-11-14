@@ -1444,11 +1444,21 @@ test "Config: advertiseHost preserves concrete host when not a wildcard" {
     try std.testing.expectEqualStrings("127.0.0.1", config.advertiseHost());
 }
 
-test "Config: parseArgs refuses a mozilla user-agent" {
+test "Config: parseArgs refuses a user-agent with control characters" {
     log.expectLog(&.{.app});
-    const argv = [_][*:0]const u8{ "lightpanda", "fetch", "--user-agent", "mozilla/1.0" };
+    const argv = [_][*:0]const u8{ "lightpanda", "fetch", "--user-agent", "Mozilla/5.0\x01" };
     const proc_args: std.process.Args = .{ .vector = &argv };
     try std.testing.expectError(error.InvalidArgument, parseArgs(std.testing.allocator, proc_args));
+}
+
+test "Config: parseArgs accepts a Mozilla user-agent" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const argv = [_][*:0]const u8{ "lightpanda", "fetch", "--user-agent", "Mozilla/5.0", "https://example.com" };
+    const proc_args: std.process.Args = .{ .vector = &argv };
+    var config = try parseArgs(arena.allocator(), proc_args);
+    defer config.deinit(arena.allocator());
+    try std.testing.expectEqualStrings("Mozilla/5.0", config.userAgent().?);
 }
 
 test "Config: parseArgs --http-version" {
@@ -1574,8 +1584,8 @@ test "Config: parseArgs tells a url from a misspelt command" {
 
 test "Config: validateUserAgent" {
     try validateUserAgent("Lightpanda/1.0");
-    try std.testing.expectError(error.Reserved, validateUserAgent("mozilla/1.0"));
-    try std.testing.expectError(error.Reserved, validateUserAgent("Mozilla/5.0"));
+    try validateUserAgent("mozilla/1.0");
+    try validateUserAgent("Mozilla/5.0");
     try std.testing.expectError(error.NonPrintable, validateUserAgent("bad\x01ua"));
 }
 
@@ -1783,7 +1793,7 @@ fn accumulateValidator(allocator: Allocator, args: *std.process.Args.Iterator, f
 fn userAgentValidator(allocator: Allocator, args: *std.process.Args.Iterator, ua: *?[]const u8) !void {
     const str = args.next() orelse return error.MissingArgument;
     validateUserAgent(str) catch |err| {
-        log.fatal(.app, "invalid user-agent", .{ .err = err, .hint = "must be printable ASCII and can't contain Mozilla" });
+        log.fatal(.app, "invalid user-agent", .{ .err = err, .hint = "must be printable ASCII" });
         return error.InvalidArgument;
     };
 
@@ -1795,10 +1805,6 @@ pub fn validateUserAgent(ua: []const u8) !void {
         if (!std.ascii.isPrint(c)) {
             return error.NonPrintable;
         }
-    }
-
-    if (std.ascii.findIgnoreCase(ua, "mozilla") != null) {
-        return error.Reserved;
     }
 }
 
