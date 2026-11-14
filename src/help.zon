@@ -424,9 +424,8 @@
     \\
     \\options:
     \\  --check
-    \\          Checks whether a newer release of {0s} is available. When one is
-    \\          found, prints the running version, the latest release, and how to
-    \\          update.
+    \\          Prints the running version. This fork does not contact the
+    \\          upstream release service.
     ,
     .completion =
     \\usage: {0s} completion <bash | fish | zsh>

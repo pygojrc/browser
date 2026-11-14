@@ -1,0 +1,46 @@
+name: Browser CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: ./.github/actions/install
+      - name: Check formatting
+        run: make fmt
+      - name: Run tests
+        run: zig build -j4 -Dprebuilt_v8_path=v8/libc_v8.a test
+      - name: Build release with snapshot
+        run: |
+          zig build -j4 -Dprebuilt_v8_path=v8/libc_v8.a -Doptimize=fast snapshot_creator -- src/snapshot.bin
+          zig build -j4 -Dprebuilt_v8_path=v8/libc_v8.a -Doptimize=fast -Dsnapshot_path=../../snapshot.bin
+      - name: Smoke test and checksum
+        run: |
+          zig-out/bin/lightpanda version
+          zig-out/bin/lightpanda version --check
+          zig-out/bin/lightpanda --help
+          sha256sum zig-out/bin/lightpanda > zig-out/bin/lightpanda.sha256
+      - name: Upload Linux x86_64 binary
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: browser-linux-x86_64-${{ github.sha }}
+          path: |
+            zig-out/bin/lightpanda
+            zig-out/bin/lightpanda.sha256
+          if-no-files-found: error

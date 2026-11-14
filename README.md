@@ -26,6 +26,10 @@ Not a Chromium fork. Not a WebKit patch. A new browser, written in Zig.</strong>
 ](https://github.com/lightpanda-io/demo)
 </div>
 
+## pygojrc fork
+
+This repository is maintained by pygojrc. The active GitHub Actions workflow builds and tests Linux x86_64 on pushes and pull requests and uploads the release binary and SHA-256 as workflow artifacts. Upstream workflows that depend on Lightpanda infrastructure are preserved under `.github/upstream-workflows/` and do not run automatically.
+
 ## Benchmarks
 
 Requesting 933 real web pages over the network on a AWS EC2 m5.large instance.
@@ -297,7 +301,7 @@ lightpanda completion zsh > ~/.zfunc/_lightpanda  # with fpath=(~/.zfunc $fpath)
 
 ### Telemetry
 
-By default, Lightpanda collects and sends usage telemetry. This can be disabled by setting an environment variable `LIGHTPANDA_DISABLE_TELEMETRY=true`. You can read Lightpanda's privacy policy at: [https://lightpanda.io/privacy-policy](https://lightpanda.io/privacy-policy).
+This pygojrc fork disables upstream usage and crash telemetry in all builds. It does not create or read the upstream telemetry instance ID. Existing IDs are left untouched. Local logs and metrics remain available.
 
 ### Core dumps
 

@@ -9,11 +9,8 @@ const IID_FILE = "iid";
 const Allocator = std.mem.Allocator;
 
 pub fn isDisabled() bool {
-    if (lp.IS_DEBUG or lp.IS_TEST) {
-        return true;
-    }
-
-    return std.c.getenv("LIGHTPANDA_DISABLE_TELEMETRY") != null;
+    // The pygojrc fork does not send usage or crash telemetry upstream.
+    return true;
 }
 
 pub const Telemetry = TelemetryT(@import("lightpanda.zig"));
