@@ -9,11 +9,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: browser-ci-${{ github.workflow }}-${{ github.ref }}
+  group: browser-ci-${{ github.workflow }}-${{ github.ref }}-${{ github.sha }}
   cancel-in-progress: true
 
 jobs:
-  build-and-test:
+  test:
     runs-on: ubuntu-22.04
     timeout-minutes: 60
     steps:
@@ -26,6 +26,15 @@ jobs:
         run: make fmt
       - name: Run tests
         run: zig build -j4 -Dprebuilt_v8_path=v8/libc_v8.a test
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: ./.github/actions/install
       - name: Build release with snapshot
         run: |
           zig build -j4 -Dprebuilt_v8_path=v8/libc_v8.a -Doptimize=fast snapshot_creator -- src/snapshot.bin
