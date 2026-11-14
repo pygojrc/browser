@@ -187,7 +187,7 @@
   testing.diverges('our only brand is Lightpanda', () => {
     testing.expectEqual(1, navigator.userAgentData.brands.length);
     testing.expectEqual('Lightpanda', navigator.userAgentData.brands[0].brand);
-    testing.expectEqual("1.1.0-", navigator.userAgentData.brands[0].version.substring(0,6));
+    testing.expectEqual('1', navigator.userAgentData.brands[0].version);
   });
 
   testing.diverges('Chrome returns a new object on each read', () => {
@@ -216,6 +216,7 @@
       testing.expectEqual(navigator.userAgentData.platform, v.platform);
       testing.expectEqual(true, Array.isArray(v.brands));
       testing.expectEqual(true, Array.isArray(v.fullVersionList));
+      testing.expectEqual(navigator.userAgentData.brands[0].version, v.brands[0].version);
       testing.diverges('our only brand is Lightpanda', () => {
         testing.expectEqual('Lightpanda', v.fullVersionList[0].brand);
         testing.expectEqual('1.1.0-', v.uaFullVersion.substring(0,6));

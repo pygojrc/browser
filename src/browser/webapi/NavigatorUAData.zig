@@ -62,7 +62,7 @@ fn getHighEntropyValues(_: *const NavigatorUAData, hints: []const []const u8, ex
 
     _ = hints;
 
-    const brands = brandList();
+    const brands = fullBrandList();
 
     return exec.js.local.?.resolvePromise(.{
         .brands = brandList(),
@@ -80,6 +80,19 @@ fn getHighEntropyValues(_: *const NavigatorUAData, hints: []const []const u8, ex
 }
 
 fn brandList() []const Brand {
+    const out = comptime blk: {
+        const src = &Config.HttpHeaders.brands;
+        var arr: [src.len]Brand = undefined;
+        for (src, 0..) |b, i| {
+            arr[i] = .{ .brand = b.brand, .version = b.version };
+        }
+        const final = arr;
+        break :blk final;
+    };
+    return &out;
+}
+
+fn fullBrandList() []const Brand {
     const out = comptime blk: {
         const src = &Config.HttpHeaders.brands;
         var arr: [src.len]Brand = undefined;
