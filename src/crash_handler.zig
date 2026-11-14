@@ -54,8 +54,7 @@ pub noinline fn crash(
                 writer.writeAll(
                     \\
                     \\Lightpanda has crashed. Please report the issue:
-                    \\https://github.com/lightpanda-io/browser/issues
-                    \\or let us know on discord: https://discord.gg/g24PtgD6
+                    \\https://github.com/pygojrc/browser/issues
                     \\
                 ) catch abort();
 

@@ -44,7 +44,7 @@ jobs:
           zig-out/bin/lightpanda version
           zig-out/bin/lightpanda version --check
           zig-out/bin/lightpanda --help
-          sha256sum zig-out/bin/lightpanda > zig-out/bin/lightpanda.sha256
+          (cd zig-out/bin && sha256sum lightpanda > lightpanda.sha256)
       - name: Capture public detector baseline
         run: |
           mkdir -p detector-baseline

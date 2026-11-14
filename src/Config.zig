@@ -602,7 +602,7 @@ pub fn interactive(self: *const Config) bool {
 pub fn tlsVerifyHost(self: *const Config) bool {
     return switch (self.mode) {
         inline .serve, .fetch, .mcp, .agent => |opts| !opts.insecure_disable_tls_host_verification,
-        // `version --check` talks to the release endpoint; always verify.
+        // Kept for version-mode compatibility; update checks are local in this fork.
         .version => true,
         else => unreachable,
     };

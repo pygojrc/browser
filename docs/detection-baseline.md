@@ -12,4 +12,9 @@ The [CI run](https://github.com/pygojrc/browser/actions/runs/43583126319) retain
 
 All three fetch processes exited zero; that means the fetch command completed, not that the detector finished or passed. Detector results can change, and a score alone is not a browser compatibility guarantee.
 
+WebGL is not currently available, and no WebGL compatibility switch is yet
+implemented. Any future implementation needs a separate disable switch and a
+regression case proving that disabling it restores the existing no-context
+behavior for sites that cannot work with the implementation.
+
 A separate same-host, headed ms_chromium 149 comparison on Sannysoft showed a Mozilla/Chrome UA, `window.chrome`, five PDF plugins and a WebGL context. Its launcher enabled a random fingerprint seed and the request was made from a different environment, so this is an illustrative reference rather than an isolated A/B measurement.

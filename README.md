@@ -42,6 +42,10 @@ See [benchmark details](https://github.com/lightpanda-io/demo/blob/main/BENCHMAR
 
 ## Quick start
 
+The distribution links and package names below describe upstream Lightpanda.
+For this fork, obtain a Linux x86_64 build from the GitHub Actions artifacts in
+`pygojrc/browser`, or build from this checkout using the instructions below.
+
 ### Install
 
 **Package Managers**
