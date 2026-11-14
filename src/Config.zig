@@ -277,6 +277,7 @@ const CommonOptions = .{
     .{ .name = "log_filter", .type = log.FilterRule, .multiple = true, .validator = logFilterValidator },
     .{ .name = "log_filter_scopes", .type = log.FilterRule, .multiple = true, .validator = logFilterValidator, .deprecated = "use --log-filter" },
     .{ .name = "user_agent_suffix", .type = ?[]const u8 },
+    .{ .name = "disable_chrome_identity", .type = bool },
     .{ .name = "http_cache_dir", .type = ?[]const u8, .path = true },
     .{ .name = "http_cache_entry_limit", .type = ?u32, .default = 1000 },
     .{ .name = "http_debug", .type = bool },
@@ -817,6 +818,13 @@ pub fn userAgent(self: *const Config) ?[]const u8 {
     };
 }
 
+pub fn chromeIdentityDisabled(self: *const Config) bool {
+    return switch (self.mode) {
+        inline .serve, .fetch, .mcp, .agent => |opts| opts.disable_chrome_identity,
+        else => false,
+    };
+}
+
 pub fn locale(self: *const Config) [:0]const u8 {
     return switch (self.mode) {
         inline .serve, .fetch, .mcp, .agent => |opts| opts.locale,
@@ -1088,37 +1096,51 @@ pub const WaitUntil = enum {
 /// HTTP header values shared across Http and Client.
 /// Must be initialized with an allocator that outlives all HTTP connections.
 pub const HttpHeaders = struct {
-    const user_agent_base: [:0]const u8 = "Lightpanda/1.0";
-
-    const Brand = struct {
-        brand: [:0]const u8,
-        version: [:0]const u8,
-        full_version: []const u8,
+    pub const Brand = struct {
+        brand: []const u8,
+        version: []const u8,
     };
-
-    /// Source of truth for client-hints brand data. Both the Sec-Ch-Ua
-    /// HTTP header and navigator.userAgentData.brands derive from this
-    /// list, so the two sides cannot drift.
-    pub const brands = [_]Brand{
-        .{ .brand = "Lightpanda", .version = "1", .full_version = lp.build_config.version },
+    pub const Identity = struct {
+        user_agent: [:0]const u8,
+        brands: []const Brand,
+        full_brands: []const Brand,
+        sec_ch_ua: [:0]const u8,
+        sec_ch_ua_full_version_list: [:0]const u8,
+        sec_ch_ua_platform: [:0]const u8,
+        product: []const u8,
+        vendor: []const u8,
     };
-
-    pub const sec_ch_ua: [:0]const u8 = blk: {
-        var out: [:0]const u8 = "";
-        for (brands, 0..) |b, i| {
-            const sep = if (i == 0) "" else ", ";
-            out = out ++ sep ++ "\"" ++ b.brand ++ "\";v=\"" ++ b.version ++ "\"";
-        }
-        break :blk out;
+    const chrome_os = switch (@import("builtin").target.os.tag) {
+        .macos => "Macintosh; Intel Mac OS X 10_15_7",
+        .windows => "Windows NT 10.0; Win64; x64",
+        else => "X11; Linux x86_64",
     };
-
-    pub const sec_ch_ua_full_version_list: [:0]const u8 = blk: {
-        var out: [:0]const u8 = "";
-        for (brands, 0..) |b, i| {
-            const sep = if (i == 0) "" else ", ";
-            out = out ++ sep ++ "\"" ++ b.brand ++ "\";v=\"" ++ b.full_version ++ "\"";
-        }
-        break :blk out;
+    const chrome_platform = switch (@import("builtin").target.os.tag) {
+        .macos => "macOS",
+        .windows => "Windows",
+        .linux => "Linux",
+        .freebsd => "FreeBSD",
+        else => "Unknown",
+    };
+    pub const chrome_identity: Identity = .{
+        .user_agent = "Mozilla/5.0 (" ++ chrome_os ++ ") AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+        .brands = &.{ .{ .brand = "Google Chrome", .version = "149" }, .{ .brand = "Chromium", .version = "149" }, .{ .brand = "Not_A Brand", .version = "99" } },
+        .full_brands = &.{ .{ .brand = "Google Chrome", .version = "149.0.7827.22" }, .{ .brand = "Chromium", .version = "149.0.7827.22" }, .{ .brand = "Not_A Brand", .version = "99.0.0.0" } },
+        .sec_ch_ua = "\"Google Chrome\";v=\"149\", \"Chromium\";v=\"149\", \"Not_A Brand\";v=\"99\"",
+        .sec_ch_ua_full_version_list = "\"Google Chrome\";v=\"149.0.7827.22\", \"Chromium\";v=\"149.0.7827.22\", \"Not_A Brand\";v=\"99.0.0.0\"",
+        .sec_ch_ua_platform = "\"" ++ chrome_platform ++ "\"",
+        .product = "Chrome/149.0.7827.22",
+        .vendor = "Google Inc.",
+    };
+    pub const legacy_identity: Identity = .{
+        .user_agent = "Lightpanda/1.0",
+        .brands = &.{.{ .brand = "Lightpanda", .version = "1" }},
+        .full_brands = &.{.{ .brand = "Lightpanda", .version = lp.build_config.version }},
+        .sec_ch_ua = "\"Lightpanda\";v=\"1\"",
+        .sec_ch_ua_full_version_list = "\"Lightpanda\";v=\"" ++ lp.build_config.version ++ "\"",
+        .sec_ch_ua_platform = "\"" ++ chrome_platform ++ "\"",
+        .product = "Lightpanda/1.0",
+        .vendor = "",
     };
 
     // The neutral default: some bot-protection frontends (e.g. Akamai on
@@ -1129,7 +1151,9 @@ pub const HttpHeaders = struct {
     // Document-navigation Accept value Chrome sends.
     pub const navigation_accept: [:0]const u8 = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8";
 
-    user_agent: [:0]const u8, // User agent value (e.g. "Lightpanda/1.0")
+    identity: *const Identity,
+    user_agent: [:0]const u8,
+    user_agent_owned: bool,
 
     proxy_bearer_header: ?[:0]const u8,
 
@@ -1171,6 +1195,8 @@ pub const HttpHeaders = struct {
     };
 
     pub fn init(allocator: Allocator, config: *const Config) !HttpHeaders {
+        const identity = if (config.chromeIdentityDisabled()) &legacy_identity else &chrome_identity;
+        const user_agent_base = identity.user_agent;
         const user_agent: [:0]const u8 = if (config.userAgent()) |ua|
             try allocator.dupeSentinel(u8, ua, 0)
         else if (config.userAgentSuffix()) |suffix|
@@ -1189,7 +1215,9 @@ pub const HttpHeaders = struct {
         const accept_language: AcceptLanguage = try .init(allocator, acceptLanguageFor(&buf, config.locale()));
 
         return .{
+            .identity = identity,
             .user_agent = user_agent,
+            .user_agent_owned = config.userAgent() != null or config.userAgentSuffix() != null,
             .proxy_bearer_header = proxy_bearer_header,
             .accept_language = accept_language,
         };
@@ -1199,7 +1227,7 @@ pub const HttpHeaders = struct {
         if (self.proxy_bearer_header) |hdr| {
             allocator.free(hdr);
         }
-        if (self.user_agent.ptr != user_agent_base.ptr) {
+        if (self.user_agent_owned) {
             allocator.free(self.user_agent);
         }
         self.accept_language.deinit(allocator);
@@ -1587,6 +1615,30 @@ test "Config: validateUserAgent" {
     try validateUserAgent("mozilla/1.0");
     try validateUserAgent("Mozilla/5.0");
     try std.testing.expectError(error.NonPrintable, validateUserAgent("bad\x01ua"));
+}
+
+test "Config: Chrome identity is default and can be disabled" {
+    var chrome = try Config.init(std.testing.allocator, "test", .{ .serve = .{} });
+    defer chrome.deinit(std.testing.allocator);
+    try std.testing.expectEqualStrings(HttpHeaders.chrome_identity.user_agent, chrome.http_headers.user_agent);
+    try std.testing.expectEqualStrings("149", chrome.http_headers.identity.brands[0].version);
+    try std.testing.expectEqualStrings("99.0.0.0", chrome.http_headers.identity.full_brands[2].version);
+
+    var legacy = try Config.init(std.testing.allocator, "test", .{ .serve = .{ .disable_chrome_identity = true } });
+    defer legacy.deinit(std.testing.allocator);
+    try std.testing.expectEqualStrings("Lightpanda/1.0", legacy.http_headers.user_agent);
+    try std.testing.expectEqualStrings("Lightpanda", legacy.http_headers.identity.brands[0].brand);
+}
+
+test "Config: parseArgs accepts the identity rollback switch" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const argv = [_][*:0]const u8{ "lightpanda", "fetch", "--disable-chrome-identity", "https://example.com" };
+    const proc_args: std.process.Args = .{ .vector = &argv };
+    var config = try parseArgs(arena.allocator(), proc_args);
+    defer config.deinit(arena.allocator());
+    try std.testing.expect(config.chromeIdentityDisabled());
+    try std.testing.expectEqualStrings("Lightpanda/1.0", config.http_headers.user_agent);
 }
 
 test "Config: validateLocale" {

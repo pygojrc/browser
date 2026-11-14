@@ -23,7 +23,12 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/install
       - name: Check formatting
-        run: make fmt
+        run: |
+          if ! make fmt; then
+            zig fmt build.zig build.zig.zon src orderfile
+            git --no-pager diff -- src build.zig build.zig.zon orderfile
+            exit 1
+          fi
       - name: Run tests
         run: zig build -j4 -Dprebuilt_v8_path=v8/libc_v8.a test
   build:
@@ -44,6 +49,7 @@ jobs:
           zig-out/bin/lightpanda version
           zig-out/bin/lightpanda version --check
           zig-out/bin/lightpanda --help
+          python3 tests/identity_smoke.py zig-out/bin/lightpanda
           (cd zig-out/bin && sha256sum lightpanda > lightpanda.sha256)
       - name: Capture public detector baseline
         run: |

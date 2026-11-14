@@ -1102,22 +1102,24 @@ pub fn buildJSONVersionResponse(app: *const App, ws_url: []const u8) ![]const u8
     }
     const body_format =
         "{{" ++
-        "\"Browser\": \"Lightpanda/1.0\", " ++
+        "\"Browser\": {f}, " ++
         "\"Protocol-Version\": \"1.3\", " ++
-        "\"User-Agent\": \"Lightpanda/1.0\", " ++
+        "\"User-Agent\": {f}, " ++
         "\"Lightpanda-Version\": \"" ++ lp.build_config.version ++ "\", " ++
         "\"webSocketDebuggerUrl\": {f}" ++
         "}}";
     // A unix socket path is user input: escape it.
     const url = std.json.fmt(ws_url, .{});
-    const body_len = std.fmt.count(body_format, .{url});
+    const product = std.json.fmt(app.config.http_headers.identity.product, .{});
+    const ua = std.json.fmt(app.config.http_headers.user_agent, .{});
+    const body_len = std.fmt.count(body_format, .{ product, ua, url });
 
     const response_format =
         "HTTP/1.1 200 OK\r\n" ++
         "Content-Length: {d}\r\n" ++
         "Content-Type: application/json; charset=UTF-8\r\n\r\n" ++
         body_format;
-    return try app.allocator.print(response_format, .{ body_len, url });
+    return try app.allocator.print(response_format, .{ body_len, product, ua, url });
 }
 
 // Where the upgraded socket goes: a new worker, or an existing session's.

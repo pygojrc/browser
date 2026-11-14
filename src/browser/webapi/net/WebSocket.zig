@@ -276,6 +276,7 @@ fn connect(self: *WebSocket, protocols: []const []const u8) !void {
 
     const allocator = arena.allocator();
     for (http_client.baselineHeaders()) |hdr| {
+        if (!http_client.sendBaselineHeader(hdr.name, resolved_url)) continue;
         try conn.addHeader(allocator, hdr.name, hdr.value);
     }
     if (protocols.len > 0) {

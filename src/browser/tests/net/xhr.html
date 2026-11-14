@@ -1021,10 +1021,8 @@
       testing.expectEqual('a, b', got['x-multi']);
       if (testing.IS_TEST_RUNNER) {
         // our own User-Agent and Sec-Ch-Ua win over the authored ones
-        testing.expectEqual(true, got['user-agent'].includes('Lightpanda'));
-        testing.expectEqual(false, got['user-agent'].includes('Mozilla'));
-        testing.expectEqual(true, got['sec-ch-ua'].includes('Lightpanda'));
-        testing.expectEqual(false, got['sec-ch-ua'].includes('Chromium'));
+        testing.expectEqual(navigator.userAgent, got['user-agent']);
+        testing.expectEqual(true, got['sec-ch-ua'].includes('Chromium'));
       }
       testing.expectEqual(false, (got['cookie'] ?? '').includes('injected'));
       testing.expectEqual(undefined, got['proxy-test']);

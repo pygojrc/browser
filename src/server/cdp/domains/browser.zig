@@ -67,13 +67,14 @@ pub fn processMessage(cmd: *CDP.Command) !void {
 }
 
 fn getVersion(cmd: *CDP.Command) !void {
-    // TODO: pre-serialize?
+    const client = &cmd.cdp.browser.http_client;
+    const legacy = client.network.config.chromeIdentityDisabled();
     return cmd.sendResult(.{
         .protocolVersion = PROTOCOL_VERSION,
-        .product = PRODUCT,
+        .product = if (legacy) PRODUCT else client.identity().product,
         .revision = REVISION,
-        .userAgent = CDP_USER_AGENT,
-        .jsVersion = JS_VERSION,
+        .userAgent = if (legacy) CDP_USER_AGENT else client.getUserAgent(),
+        .jsVersion = if (legacy) JS_VERSION else "15.5.35.13",
     }, .{});
 }
 
@@ -261,10 +262,10 @@ test "cdp.browser: getVersion" {
     try ctx.expectSentCount(1);
     try ctx.expectSentResult(.{
         .protocolVersion = PROTOCOL_VERSION,
-        .product = PRODUCT,
+        .product = lp.Config.HttpHeaders.chrome_identity.product,
         .revision = REVISION,
-        .userAgent = CDP_USER_AGENT,
-        .jsVersion = JS_VERSION,
+        .userAgent = lp.Config.HttpHeaders.chrome_identity.user_agent,
+        .jsVersion = "15.5.35.13",
     }, .{ .id = 32, .index = 0, .session_id = null });
 }
 
@@ -275,7 +276,7 @@ test "cdp.browser: replies echo the sessionId" {
 
     _ = try ctx.loadBrowserContext(.{ .session_id = "SID-X" });
     try ctx.processMessage(.{ .id = 1, .method = "Browser.getVersion", .sessionId = "SID-X" });
-    try ctx.expectSentResult(.{ .product = PRODUCT }, .{ .id = 1, .session_id = "SID-X" });
+    try ctx.expectSentResult(.{ .product = lp.Config.HttpHeaders.chrome_identity.product }, .{ .id = 1, .session_id = "SID-X" });
 }
 
 test "cdp.browser: getWindowForTarget" {

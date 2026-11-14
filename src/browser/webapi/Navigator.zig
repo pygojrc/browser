@@ -117,8 +117,8 @@ fn getMaxTouchPoints(_: *const Navigator) u32 {
     return 0;
 }
 
-pub fn getVendor(_: *const Navigator) []const u8 {
-    return "";
+pub fn getVendor(_: *const Navigator, exec: *const Execution) []const u8 {
+    return exec.session.browser.http_client.identity().vendor;
 }
 
 pub fn getProduct(_: *const Navigator) []const u8 {
@@ -138,7 +138,8 @@ pub fn getGlobalPrivacyControl(_: *const Navigator) bool {
     return false;
 }
 
-pub fn getPlatform(_: *const Navigator) []const u8 {
+pub fn getPlatform(_: *const Navigator, exec: *const Execution) []const u8 {
+    if (exec.session.browser.http_client.platform_override) |platform| return platform;
     return switch (builtin.target.os.tag) {
         .macos => "MacIntel",
         .windows => "Win32",

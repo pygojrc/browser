@@ -636,10 +636,12 @@
     \\          Defaults to the host time zone.
     \\  --user-agent <STRING>
     \\          Override the User-Agent header entirely using printable ASCII.
-    \\          Client Hints are not changed by this option. Incompatible with
-    \\          --user-agent-suffix.
+    \\          Chrome-identity Client Hints are omitted for a custom UA.
+    \\          Incompatible with --user-agent-suffix.
     \\  --user-agent-suffix <STRING>
-    \\          Suffix appended to the Lightpanda/X.Y User-Agent.
+    \\          Suffix appended to the selected default User-Agent.
+    \\  --disable-chrome-identity
+    \\          Restore the original Lightpanda UA and Client Hints identity.
     \\  --v8-flags-unsafe <FLAGS>
     \\          Flags passed as-is to the V8 JavaScript engine, space-separated.
     \\          e.g. --v8-flags-unsafe "--expose-gc --stack-size 1000".

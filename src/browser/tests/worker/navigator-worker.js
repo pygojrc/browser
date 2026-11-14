@@ -41,6 +41,7 @@ onmessage = async function(event) {
       // NavigatorUAData
       has_ua_data: ua != null,
       ua_high_entropy_arch: high_entropy ? high_entropy.architecture : null,
+      ua_brands_match_page: ua != null && JSON.stringify(ua.brands) === event.data.pageBrands,
 
       // [Exposed=Window] members must NOT leak into the worker realm.
       no_plugins: navigator.plugins === undefined,

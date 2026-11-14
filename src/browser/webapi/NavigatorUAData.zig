@@ -26,13 +26,11 @@ const NavigatorUAData = @This();
 
 _pad: bool = false,
 
-const Brand = struct {
-    brand: []const u8,
-    version: []const u8,
-};
+const Brand = Config.HttpHeaders.Brand;
 
-fn getBrands(_: *const NavigatorUAData) []const Brand {
-    return brandList();
+fn getBrands(_: *const NavigatorUAData, exec: *const Execution) []const Brand {
+    const client = &exec.session.browser.http_client;
+    return if (client.clientHintsEnabled()) client.identity().brands else &.{};
 }
 
 fn getMobile(_: *const NavigatorUAData) bool {
@@ -43,66 +41,41 @@ fn getPlatform(_: *const NavigatorUAData) []const u8 {
     return uaPlatform();
 }
 
-pub fn toJSON(_: *const NavigatorUAData) struct {
+pub fn toJSON(self: *const NavigatorUAData, exec: *const Execution) struct {
     brands: []const Brand,
     mobile: bool,
     platform: []const u8,
 } {
     return .{
         .mobile = false,
-        .brands = brandList(),
+        .brands = self.getBrands(exec),
         .platform = uaPlatform(),
     };
 }
 
-fn getHighEntropyValues(_: *const NavigatorUAData, hints: []const []const u8, exec: *const Execution) !js.Promise {
+fn getHighEntropyValues(self: *const NavigatorUAData, hints: []const []const u8, exec: *const Execution) !js.Promise {
     // This should always return `brands` + `mobile` + `platform` and then whatever
     // "hints" field is requested (assuming the browser has permission), but it's
     // also valid to just return everything.
 
     _ = hints;
 
-    const brands = fullBrandList();
+    const client = &exec.session.browser.http_client;
+    const brands: []const Brand = if (client.clientHintsEnabled()) client.identity().full_brands else &.{};
 
     return exec.js.local.?.resolvePromise(.{
-        .brands = brandList(),
+        .brands = self.getBrands(exec),
         .mobile = false,
         .platform = uaPlatform(),
         .architecture = uaArchitecture(),
         .bitness = uaBitness(),
         .model = "",
         .platformVersion = "",
-        .uaFullVersion = if (brands.len > 0) brands[0].version else "1.0.0.0",
+        .uaFullVersion = if (brands.len > 0) brands[0].version else "",
         .fullVersionList = brands,
         .wow64 = false,
         .formFactors = [_][]const u8{"Desktop"},
     });
-}
-
-fn brandList() []const Brand {
-    const out = comptime blk: {
-        const src = &Config.HttpHeaders.brands;
-        var arr: [src.len]Brand = undefined;
-        for (src, 0..) |b, i| {
-            arr[i] = .{ .brand = b.brand, .version = b.version };
-        }
-        const final = arr;
-        break :blk final;
-    };
-    return &out;
-}
-
-fn fullBrandList() []const Brand {
-    const out = comptime blk: {
-        const src = &Config.HttpHeaders.brands;
-        var arr: [src.len]Brand = undefined;
-        for (src, 0..) |b, i| {
-            arr[i] = .{ .brand = b.brand, .version = b.full_version };
-        }
-        const final = arr;
-        break :blk final;
-    };
-    return &out;
 }
 
 fn uaPlatform() []const u8 {

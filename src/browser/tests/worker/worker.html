@@ -323,7 +323,7 @@
     worker.onmessage = function(event) {
       state.resolve(event.data);
     };
-    worker.postMessage({ pageUserAgent: navigator.userAgent });
+    worker.postMessage({ pageUserAgent: navigator.userAgent, pageBrands: JSON.stringify(navigator.userAgentData.brands) });
 
     await state.done((data) => {
       testing.expectTrue(data.ok, 'worker navigator error: ' + data.err);
@@ -351,6 +351,7 @@
 
       // NavigatorUAData
       testing.expectEqual(true, r.has_ua_data);
+      testing.expectEqual(true, r.ua_brands_match_page);
       testing.expectTrue(typeof r.ua_high_entropy_arch === 'string');
 
       // [Exposed=Window] members aren't part of WorkerNavigator.

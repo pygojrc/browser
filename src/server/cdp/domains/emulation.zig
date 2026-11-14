@@ -144,10 +144,12 @@ pub fn setUserAgentOverride(cmd: *CDP.Command) !void {
         userAgent: []const u8,
         acceptLanguage: ?[]const u8 = null,
         platform: ?[]const u8 = null,
+        userAgentMetadata: ?std.json.Value = null,
     })) orelse return error.InvalidParams;
 
-    if (params.platform) |v| {
-        log.debug(.not_implemented, "Emulation.setUserAgentOverride", .{ .param = "platform", .value = v });
+    if (params.userAgentMetadata != null) return cmd.sendError(-32602, "userAgentMetadata is not supported", .{});
+    if (params.platform) |platform| {
+        Config.validateUserAgent(platform) catch return cmd.sendError(-32602, "Platform contains non-printable characters", .{});
     }
 
     const ua = params.userAgent;
@@ -163,7 +165,7 @@ pub fn setUserAgentOverride(cmd: *CDP.Command) !void {
         try http_client.setAcceptLanguageOverride(accept_language);
     }
 
-    try http_client.setUserAgentOverride(ua);
+    try http_client.setUserAgentOverride(ua, params.platform);
     bc.user_agent_changed = true;
 
     return cmd.sendResult(null, .{});
@@ -415,10 +417,11 @@ test "cdp.Emulation: setUserAgentOverride acceptLanguage drives navigator.langua
     try ctx.processMessage(.{
         .id = 1,
         .method = "Emulation.setUserAgentOverride",
-        .params = .{ .userAgent = "CustomBot/2.0", .acceptLanguage = "de-DE,de;q=0.9, en;q=0.8" },
+        .params = .{ .userAgent = "CustomBot/2.0", .acceptLanguage = "de-DE,de;q=0.9, en;q=0.8", .platform = "CustomPlatform" },
     });
     try ctx.expectSentResult(null, .{ .id = 1 });
     try expectJs(frame, "navigator.language === 'de-DE' && navigator.languages.join() === 'de-DE,de,en'");
+    try expectJs(frame, "navigator.platform === 'CustomPlatform' && navigator.userAgentData.brands.length === 0");
     try std.testing.expectEqualStrings("de-DE,de;q=0.9, en;q=0.8", ctx.cdp().browser.http_client.getAcceptLanguage());
 
     // Both the Mozilla user agent and the requested language apply.
@@ -430,6 +433,7 @@ test "cdp.Emulation: setUserAgentOverride acceptLanguage drives navigator.langua
     try ctx.expectSentResult(null, .{ .id = 2 });
     try expectJs(frame, "navigator.language === 'fr-FR' && navigator.languages.length === 1");
     try expectJs(frame, "navigator.userAgent === 'Mozilla/5.0' && navigator.appVersion === '5.0'");
+    try expectJs(frame, "navigator.platform !== 'CustomPlatform'");
     try std.testing.expectEqualStrings("Mozilla/5.0", ctx.cdp().browser.http_client.getUserAgent());
 
     try ctx.processMessage(.{

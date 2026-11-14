@@ -303,11 +303,23 @@ lightpanda completion bash > ~/.local/share/bash-completion/completions/lightpan
 lightpanda completion zsh > ~/.zfunc/_lightpanda  # with fpath=(~/.zfunc $fpath) before compinit
 ```
 
+### Browser identity
+
+The default identity uses a Chrome 149-compatible User-Agent and Client Hints.
+Use `--disable-chrome-identity` to restore the original Lightpanda identity.
+This changes the reported identity, not the browser engine: APIs such as WebGL
+and PDF plugins may still be unavailable. The browser does not currently send
+high-entropy Client Hints after `Accept-CH` negotiation.
+
+The `--user-agent` option and CDP user-agent override accept printable ASCII,
+including Mozilla-style user agents. A custom UA takes precedence; in Chrome
+identity mode Client Hints are omitted because no matching metadata is known.
+CDP `platform` overrides `navigator.platform`, while CDP `userAgentMetadata`
+is currently rejected. Page scripts cannot override the User-Agent header.
+
 ### Telemetry
 
 This pygojrc fork disables upstream usage and crash telemetry in all builds. It does not create or read the upstream telemetry instance ID. Existing IDs are left untouched. Local logs and metrics remain available.
-
-The `--user-agent` option and CDP user-agent override accept printable ASCII, including Mozilla-style user agents. They currently do not update Client Hints or the emulated platform, so a custom user agent can be inconsistent with those values. Page scripts cannot override the browser's User-Agent request header.
 
 ### Core dumps
 
