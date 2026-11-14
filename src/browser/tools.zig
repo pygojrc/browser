@@ -3600,7 +3600,7 @@ test "download: a redirect's Set-Cookie lands in the jar and the next hop carrie
 
     const body = try std.Io.Dir.cwd().readFileAlloc(lp.io, path, testing.arena_allocator, .limited(8192));
     try std.testing.expect(std.mem.find(u8, body, "lp_redirect=1") != null);
-    try std.testing.expect(std.mem.find(u8, body, "Lightpanda/") != null);
+    try std.testing.expect(std.mem.find(u8, body, "Chrome/149.0.0.0") != null);
 }
 
 test "download: a multi-megabyte body arrives intact" {

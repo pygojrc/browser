@@ -3338,7 +3338,7 @@ test "server: get /json/version" {
 
         const res1 = try c.httpRequest("GET /json/version HTTP/1.1\r\n\r\n");
         try testing.expect(std.mem.startsWith(u8, res1, "HTTP/1.1 200 OK\r\n"));
-        try testing.expect(std.mem.find(u8, res1, "\"Browser\": \"Lightpanda/") != null);
+        try testing.expect(std.mem.find(u8, res1, "\"Browser\": \"Chrome/") != null);
         try testing.expect(std.mem.find(u8, res1, "\"Protocol-Version\": \"1.3\"") != null);
         const ws_url = try testing.arena_allocator.print("\"webSocketDebuggerUrl\": \"ws://127.0.0.1:{d}/\"", .{testing.test_cdp_port});
         try testing.expect(std.mem.find(u8, res1, ws_url) != null);
@@ -3351,7 +3351,7 @@ test "server: get /json/version" {
 
         const res1 = try c.httpRequest("GET /json/version HTTP/1.1\r\n\r\n");
         try testing.expect(std.mem.startsWith(u8, res1, "HTTP/1.1 200 OK\r\n"));
-        try testing.expect(std.mem.find(u8, res1, "\"Browser\": \"Lightpanda/") != null);
+        try testing.expect(std.mem.find(u8, res1, "\"Browser\": \"Chrome/") != null);
     }
 }
 

@@ -22,6 +22,7 @@ const lp = @import("lightpanda");
 const CDP = @import("../CDP.zig");
 const Config = @import("../../../Config.zig");
 const Mime = @import("../../../browser/Mime.zig");
+const UserAgentMetadata = @import("../../../network/UserAgentMetadata.zig");
 const js = @import("../../../browser/js/js.zig");
 
 const log = lp.log;
@@ -144,10 +145,12 @@ pub fn setUserAgentOverride(cmd: *CDP.Command) !void {
         userAgent: []const u8,
         acceptLanguage: ?[]const u8 = null,
         platform: ?[]const u8 = null,
-        userAgentMetadata: ?std.json.Value = null,
+        userAgentMetadata: ?UserAgentMetadata.Input = null,
     })) orelse return error.InvalidParams;
 
-    if (params.userAgentMetadata != null) return cmd.sendError(-32602, "userAgentMetadata is not supported", .{});
+    if (params.userAgentMetadata) |metadata| {
+        metadata.validate() catch return cmd.sendError(-32602, "Invalid userAgentMetadata", .{});
+    }
     if (params.platform) |platform| {
         Config.validateUserAgent(platform) catch return cmd.sendError(-32602, "Platform contains non-printable characters", .{});
     }
@@ -165,7 +168,7 @@ pub fn setUserAgentOverride(cmd: *CDP.Command) !void {
         try http_client.setAcceptLanguageOverride(accept_language);
     }
 
-    try http_client.setUserAgentOverride(ua, params.platform);
+    try http_client.setUserAgentOverride(ua, params.platform, params.userAgentMetadata);
     bc.user_agent_changed = true;
 
     return cmd.sendResult(null, .{});
@@ -402,6 +405,67 @@ test "cdp.Emulation: setUserAgentOverride with optional params" {
     });
 
     try ctx.expectSentResult(null, .{ .id = 5 });
+}
+
+test "cdp.Emulation: userAgentMetadata drives headers and navigator" {
+    var ctx = try testing.context();
+    defer ctx.deinit();
+    const bc = try ctx.loadBrowserContext(.{ .id = "BID-META", .url = "hi.html", .target_id = "FID-000000META".* });
+    const target = try testing.firstTarget(bc);
+    const frame = target.mainFrame() orelse unreachable;
+    try ctx.processMessage(.{
+        .id = 1,
+        .method = "Emulation.setUserAgentOverride",
+        .params = .{
+            .userAgent = "Example/7.0",
+            .platform = "ExamplePlatform",
+            .userAgentMetadata = .{
+                .brands = .{.{ .brand = "Example", .version = "7" }},
+                .fullVersionList = .{.{ .brand = "Example", .version = "7.1.2.3" }},
+                .platform = "ExampleOS",
+                .platformVersion = "2.0",
+                .architecture = "x86",
+                .model = "",
+                .mobile = true,
+                .bitness = "64",
+            },
+        },
+    });
+    try ctx.expectSentResult(null, .{ .id = 1 });
+    try expectJs(frame, "navigator.userAgent === 'Example/7.0' && navigator.platform === 'ExamplePlatform'");
+    try expectJs(frame, "navigator.userAgentData.brands[0].brand === 'Example' && navigator.userAgentData.platform === 'ExampleOS' && navigator.userAgentData.mobile");
+    {
+        var ls: js.Local.Scope = undefined;
+        frame.js.localScope(&ls);
+        defer ls.deinit();
+        _ = try ls.local.exec("navigator.userAgentData.getHighEntropyValues(['fullVersionList', 'platformVersion']).then(v => window.__ua_metadata = v)", null);
+    }
+    var runner = bc.session.runner(.{});
+    _ = try runner.tickForFrame(target.frame_id.?, 1000, .{ .until = .done });
+    try expectJs(frame, "window.__ua_metadata.fullVersionList[0].version === '7.1.2.3' && window.__ua_metadata.platformVersion === '2.0'");
+    const client = &ctx.cdp().browser.http_client;
+    const headers = client.baselineHeaders();
+    try std.testing.expectEqualStrings("\"Example\";v=\"7\"", headers[1].value);
+    try std.testing.expectEqualStrings("?1", headers[3].value);
+    try std.testing.expectEqualStrings("\"ExampleOS\"", headers[4].value);
+    try testing.expect(client.sendBaselineHeader("Sec-Ch-Ua", "https://example.com/"));
+
+    try ctx.processMessage(.{
+        .id = 2,
+        .method = "Network.setUserAgentOverride",
+        .params = .{
+            .userAgent = "Invalid/1",
+            .userAgentMetadata = .{
+                .platform = "Bad\r\nHeader",
+                .platformVersion = "",
+                .architecture = "",
+                .model = "",
+                .mobile = false,
+            },
+        },
+    });
+    try ctx.expectSentError(-32602, "Invalid userAgentMetadata", .{ .id = 2 });
+    try std.testing.expectEqualStrings("Example/7.0", client.getUserAgent());
 }
 
 test "cdp.Emulation: setUserAgentOverride acceptLanguage drives navigator.languages" {

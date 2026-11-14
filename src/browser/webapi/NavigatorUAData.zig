@@ -30,14 +30,19 @@ const Brand = Config.HttpHeaders.Brand;
 
 fn getBrands(_: *const NavigatorUAData, exec: *const Execution) []const Brand {
     const client = &exec.session.browser.http_client;
+    if (client.user_agent_metadata) |*metadata| return metadata.brands;
     return if (client.clientHintsEnabled()) client.identity().brands else &.{};
 }
 
-fn getMobile(_: *const NavigatorUAData) bool {
+fn getMobile(_: *const NavigatorUAData, exec: *const Execution) bool {
+    const client = &exec.session.browser.http_client;
+    if (client.user_agent_metadata) |*metadata| return metadata.mobile;
     return false;
 }
 
-fn getPlatform(_: *const NavigatorUAData) []const u8 {
+fn getPlatform(_: *const NavigatorUAData, exec: *const Execution) []const u8 {
+    const client = &exec.session.browser.http_client;
+    if (client.user_agent_metadata) |*metadata| return metadata.platform;
     return uaPlatform();
 }
 
@@ -47,9 +52,9 @@ pub fn toJSON(self: *const NavigatorUAData, exec: *const Execution) struct {
     platform: []const u8,
 } {
     return .{
-        .mobile = false,
+        .mobile = self.getMobile(exec),
         .brands = self.getBrands(exec),
-        .platform = uaPlatform(),
+        .platform = self.getPlatform(exec),
     };
 }
 
@@ -61,20 +66,21 @@ fn getHighEntropyValues(self: *const NavigatorUAData, hints: []const []const u8,
     _ = hints;
 
     const client = &exec.session.browser.http_client;
-    const brands: []const Brand = if (client.clientHintsEnabled()) client.identity().full_brands else &.{};
+    const metadata = if (client.user_agent_metadata) |*value| value else null;
+    const brands: []const Brand = if (metadata) |value| value.full_brands else if (client.clientHintsEnabled()) client.identity().full_brands else &.{};
 
     return exec.js.local.?.resolvePromise(.{
         .brands = self.getBrands(exec),
-        .mobile = false,
-        .platform = uaPlatform(),
-        .architecture = uaArchitecture(),
-        .bitness = uaBitness(),
-        .model = "",
-        .platformVersion = "",
-        .uaFullVersion = if (brands.len > 0) brands[0].version else "",
+        .mobile = self.getMobile(exec),
+        .platform = self.getPlatform(exec),
+        .architecture = if (metadata) |value| value.architecture else uaArchitecture(),
+        .bitness = if (metadata) |value| value.bitness else uaBitness(),
+        .model = if (metadata) |value| value.model else "",
+        .platformVersion = if (metadata) |value| value.platform_version else "",
+        .uaFullVersion = if (metadata) |value| value.full_version else if (brands.len > 0) brands[0].version else "",
         .fullVersionList = brands,
-        .wow64 = false,
-        .formFactors = [_][]const u8{"Desktop"},
+        .wow64 = if (metadata) |value| value.wow64 else false,
+        .formFactors = if (metadata) |value| value.form_factors else &[_][]const u8{"Desktop"},
     });
 }
 

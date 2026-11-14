@@ -332,7 +332,7 @@
     }
   }
 
-  const IS_TEST_RUNNER = window.navigator.userAgent.startsWith("Lightpanda/");
+  const IS_TEST_RUNNER = window.navigator.userAgent.endsWith(" internal-tester");
 
   window.testing = {
     fail: fail,

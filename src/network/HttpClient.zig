@@ -39,6 +39,7 @@ const Cache = @import("cache/Cache.zig");
 const RobotsGate = @import("RobotsGate.zig");
 const CorsGate = @import("CorsGate.zig");
 const UrlBlocklist = @import("UrlBlocklist.zig");
+pub const UserAgentMetadata = @import("UserAgentMetadata.zig");
 const repeat = @import("../string.zig").repeat;
 
 pub const BlockPattern = UrlBlocklist.Pattern;
@@ -170,6 +171,7 @@ test_fail_submit: if (lp.IS_TEST) ?anyerror else void = if (lp.IS_TEST) null els
 // Allocated from self.allocator when set, null otherwise.
 user_agent_override: ?[:0]const u8 = null,
 platform_override: ?[]const u8 = null,
+user_agent_metadata: ?UserAgentMetadata.Stored = null,
 
 // Accept-Language override set via CDP Emulation.setUserAgentOverride.
 // Drives both the request header and navigator.languages.
@@ -317,13 +319,19 @@ pub fn incrReqId(self: *Client) u32 {
 }
 
 // Set a user agent override, allocated from self.allocator.
-pub fn setUserAgentOverride(self: *Client, ua: []const u8, platform: ?[]const u8) !void {
+pub fn setUserAgentOverride(self: *Client, ua: []const u8, platform: ?[]const u8, metadata: ?UserAgentMetadata.Input) !void {
     const new_ua = try self.allocator.dupeSentinel(u8, ua, 0);
     errdefer self.allocator.free(new_ua);
     const new_platform = if (platform) |value| try self.allocator.dupe(u8, value) else null;
+    errdefer if (new_platform) |value| self.allocator.free(value);
+    const new_metadata = if (metadata) |input| blk: {
+        try input.validate();
+        break :blk try UserAgentMetadata.Stored.init(self.allocator, input, self.network.config.http_headers.identity);
+    } else null;
     self.clearUserAgentOverride();
     self.user_agent_override = new_ua;
     self.platform_override = new_platform;
+    self.user_agent_metadata = new_metadata;
 }
 
 // Clear any user agent override, restoring the default from config.
@@ -335,6 +343,10 @@ pub fn clearUserAgentOverride(self: *Client) void {
     if (self.platform_override) |platform| {
         self.allocator.free(platform);
         self.platform_override = null;
+    }
+    if (self.user_agent_metadata) |*metadata| {
+        metadata.deinit();
+        self.user_agent_metadata = null;
     }
 }
 
@@ -500,12 +512,12 @@ pub fn identity(self: *const Client) *const lp.Config.HttpHeaders.Identity {
 
 // A custom UA has no matching Client Hints metadata unless supplied separately.
 pub fn clientHintsEnabled(self: *const Client) bool {
-    return self.network.config.chromeIdentityDisabled() or
+    return self.user_agent_metadata != null or self.network.config.chromeIdentityDisabled() or
         (self.user_agent_override == null and self.network.config.userAgent() == null);
 }
 
 pub fn sendBaselineHeader(self: *const Client, name: []const u8, url: []const u8) bool {
-    if (self.network.config.chromeIdentityDisabled()) {
+    if (self.network.config.chromeIdentityDisabled() and self.user_agent_metadata == null) {
         return !std.ascii.eqlIgnoreCase(name, "Sec-Ch-Ua-Mobile") and
             !std.ascii.eqlIgnoreCase(name, "Sec-Ch-Ua-Platform");
     }
@@ -525,7 +537,7 @@ test "HttpClient: Chrome hints require a trustworthy URL and matching identity" 
     try testing.expect(!client.sendBaselineHeader("Sec-Ch-Ua", "http://example.com/"));
     try testing.expect(client.sendBaselineHeader("Sec-Ch-Ua", "http://127.0.0.1/"));
     try testing.expect(!client.sendBaselineHeader("Sec-Ch-Ua-Full-Version-List", "https://example.com/"));
-    try client.setUserAgentOverride("CustomBrowser/7.0", null);
+    try client.setUserAgentOverride("CustomBrowser/7.0", null, null);
     defer client.clearUserAgentOverride();
     try testing.expect(!client.sendBaselineHeader("Sec-Ch-Ua", "https://example.com/"));
 }
@@ -540,12 +552,13 @@ pub fn getLanguages(self: *const Client) []const []const u8 {
 
 // Headers _all_ requests include.
 pub fn baselineHeaders(self: *const Client) [6]Transfer.RequestHeader {
+    const metadata = if (self.user_agent_metadata) |*value| value else null;
     return .{
         .{ .name = "User-Agent", .value = self.getUserAgent() },
-        .{ .name = "Sec-Ch-Ua", .value = self.identity().sec_ch_ua, .source = .fixed },
-        .{ .name = "Sec-Ch-Ua-Full-Version-List", .value = self.identity().sec_ch_ua_full_version_list, .source = .fixed },
-        .{ .name = "Sec-Ch-Ua-Mobile", .value = "?0", .source = .fixed },
-        .{ .name = "Sec-Ch-Ua-Platform", .value = self.identity().sec_ch_ua_platform, .source = .fixed },
+        .{ .name = "Sec-Ch-Ua", .value = if (metadata) |m| m.brands_header else self.identity().sec_ch_ua, .source = .fixed },
+        .{ .name = "Sec-Ch-Ua-Full-Version-List", .value = if (metadata) |m| m.full_brands_header else self.identity().sec_ch_ua_full_version_list, .source = .fixed },
+        .{ .name = "Sec-Ch-Ua-Mobile", .value = if (metadata != null and metadata.?.mobile) "?1" else "?0", .source = .fixed },
+        .{ .name = "Sec-Ch-Ua-Platform", .value = if (metadata) |m| m.platform_header else self.identity().sec_ch_ua_platform, .source = .fixed },
         // Omitting Accept-Language triggers bot-protection on some CDNs
         // (Akamai) when Accept-Encoding is present.
         .{ .name = "Accept-Language", .value = self.getAcceptLanguage() },

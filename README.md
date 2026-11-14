@@ -314,8 +314,9 @@ high-entropy Client Hints after `Accept-CH` negotiation.
 The `--user-agent` option and CDP user-agent override accept printable ASCII,
 including Mozilla-style user agents. A custom UA takes precedence; in Chrome
 identity mode Client Hints are omitted because no matching metadata is known.
-CDP `platform` overrides `navigator.platform`, while CDP `userAgentMetadata`
-is currently rejected. Page scripts cannot override the User-Agent header.
+CDP `platform` overrides `navigator.platform`; `userAgentMetadata` supplies the
+matching low-entropy request headers and JavaScript low- and high-entropy values.
+Page scripts cannot override the User-Agent header.
 
 ### Telemetry
 

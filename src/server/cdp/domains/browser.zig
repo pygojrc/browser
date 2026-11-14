@@ -264,7 +264,7 @@ test "cdp.browser: getVersion" {
         .protocolVersion = PROTOCOL_VERSION,
         .product = lp.Config.HttpHeaders.chrome_identity.product,
         .revision = REVISION,
-        .userAgent = lp.Config.HttpHeaders.chrome_identity.user_agent,
+        .userAgent = lp.Config.HttpHeaders.chrome_identity.user_agent ++ " internal-tester",
         .jsVersion = "15.5.35.13",
     }, .{ .id = 32, .index = 0, .session_id = null });
 }
