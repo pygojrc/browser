@@ -278,6 +278,7 @@ const CommonOptions = .{
     .{ .name = "log_filter_scopes", .type = log.FilterRule, .multiple = true, .validator = logFilterValidator, .deprecated = "use --log-filter" },
     .{ .name = "user_agent_suffix", .type = ?[]const u8 },
     .{ .name = "disable_chrome_identity", .type = bool },
+    .{ .name = "disable_history_rate_limit", .type = bool },
     .{ .name = "http_cache_dir", .type = ?[]const u8, .path = true },
     .{ .name = "http_cache_entry_limit", .type = ?u32, .default = 1000 },
     .{ .name = "http_debug", .type = bool },
@@ -821,6 +822,13 @@ pub fn userAgent(self: *const Config) ?[]const u8 {
 pub fn chromeIdentityDisabled(self: *const Config) bool {
     return switch (self.mode) {
         inline .serve, .fetch, .mcp, .agent => |opts| opts.disable_chrome_identity,
+        else => false,
+    };
+}
+
+pub fn historyRateLimitDisabled(self: *const Config) bool {
+    return switch (self.mode) {
+        inline .serve, .fetch, .mcp, .agent => |opts| opts.disable_history_rate_limit,
         else => false,
     };
 }

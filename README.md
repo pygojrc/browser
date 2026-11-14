@@ -318,6 +318,10 @@ CDP `platform` overrides `navigator.platform`; `userAgentMetadata` supplies the
 matching low-entropy request headers and JavaScript low- and high-entropy values.
 Page scripts cannot override the User-Agent header.
 
+`history.pushState` and `history.replaceState` share a per-frame limit of 200
+updates in 10 seconds. Pass `--disable-history-rate-limit` to restore unlimited
+updates if a site needs them. This does not limit other navigation methods.
+
 ### Telemetry
 
 This pygojrc fork disables upstream usage and crash telemetry in all builds. It does not create or read the upstream telemetry instance ID. Existing IDs are left untouched. Local logs and metrics remain available.

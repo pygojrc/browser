@@ -19,6 +19,11 @@ class Page(http.server.BaseHTTPRequestHandler):
         document.body.setAttribute('data-version', navigator.appVersion);
         document.body.setAttribute('data-vendor', navigator.vendor);
         document.body.setAttribute('data-brands', JSON.stringify(navigator.userAgentData.brands));
+        for (let i = 1; i <= 300; i++) {
+          if (i % 2) history.pushState(i, '');
+          else history.replaceState(i, '');
+        }
+        document.body.setAttribute('data-history-updates', String(history.state));
         </script></body></html>'''
         self.send_response(200)
         self.send_header('Content-Type', 'text/html; charset=utf-8')
@@ -52,6 +57,8 @@ def check(binary, url, options, mode):
     assert attrs is not None and 'data-ua' in attrs, (mode, result.stdout, result.stderr)
     assert attrs['data-ua'] == headers['user-agent'], (mode, attrs, headers)
     brands = json.loads(attrs['data-brands'])
+    expected_updates = '300' if mode == 'unlimited' else '200'
+    assert attrs['data-history-updates'] == expected_updates, (mode, attrs)
     if mode == 'chrome':
         assert 'Chrome/149.0.0.0' in attrs['data-ua'], attrs
         assert attrs['data-version'] == attrs['data-ua'].removeprefix('Mozilla/'), attrs
@@ -68,7 +75,7 @@ def check(binary, url, options, mode):
         assert headers['sec-ch-ua'] == '"Lightpanda";v="1"', headers
         assert 'sec-ch-ua-full-version-list' in headers, headers
         assert 'sec-ch-ua-mobile' not in headers and 'sec-ch-ua-platform' not in headers, headers
-    else:
+    elif mode == 'custom':
         assert attrs['data-ua'] == 'CustomBrowser/7.0', attrs
         assert brands == [], brands
         assert 'sec-ch-ua' not in headers, headers
@@ -85,6 +92,7 @@ def main():
         check(binary, url, [], 'chrome')
         check(binary, url, ['--disable-chrome-identity'], 'legacy')
         check(binary, url, ['--user-agent', 'CustomBrowser/7.0'], 'custom')
+        check(binary, url, ['--disable-history-rate-limit'], 'unlimited')
     finally:
         server.shutdown()
         server.server_close()

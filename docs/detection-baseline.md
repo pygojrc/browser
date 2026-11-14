@@ -18,3 +18,13 @@ regression case proving that disabling it restores the existing no-context
 behavior for sites that cannot work with the implementation.
 
 A separate same-host, headed ms_chromium 149 comparison on Sannysoft showed a Mozilla/Chrome UA, `window.chrome`, five PDF plugins and a WebGL context. Its launcher enabled a random fingerprint seed and the request was made from a different environment, so this is an illustrative reference rather than an isolated A/B measurement.
+
+## Chrome-identity baseline (2026-11-14)
+
+The [CI run for `a2ca62f`](https://github.com/pygojrc/browser/actions/runs/43592975913) captured the default Chrome-compatible identity on a Linux x86_64 GitHub runner with `fetch --dump markdown --wait-ms 12000`. The `detector-baseline` artifact contains the raw output and exit codes. All three commands exited zero; botstop nevertheless remained at its running stage. No controlled same-environment Chrome comparison was captured.
+
+- Sannysoft reported the Chrome 149 UA, passed the memory probe, and reported missing `window.chrome`, no WebGL context, no battery API and zero plugins. Its plugin type test also requires a nonempty plugin list; it does not establish that `navigator.plugins instanceof PluginArray` is false. The browser has no built-in PDF viewer, so exposing PDF plugins would claim functionality it cannot provide.
+- Rebrowser executed passive checks and reported agreement between UA, platform and Client Hints. It flagged missing `window.chrome` and unrestricted rapid History API updates, and warned about popup blocking. Its platform probe also recorded the unresolved system-color value `activetext` instead of a computed RGB color. Several automation probes require the documented CDP interactions, which this fetch does not perform.
+- Botstop remained on its probe-running screen; its output is not a verdict.
+
+The History API now limits `pushState` and `replaceState` together to 200 updates per 10 seconds per frame, modeled on Chromium's navigation limiter. It can be disabled independently using `--disable-history-rate-limit`; it does not cover other navigation methods. The CI smoke test checks both modes. A complete Chromium navigation limiter, popup blocking, CSS system-color resolution, a functional PDF viewer/plugins, battery integration, WebGL/GPU and the Chrome extension/runtime APIs require separate implementation and validation; none is claimed here. In particular, no fake plugin, battery state or WebGL context is supplied merely to change a detector result.

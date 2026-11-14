@@ -17,6 +17,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
+const lp = @import("lightpanda");
 
 const js = @import("../js/js.zig");
 const Frame = @import("../Frame.zig");
@@ -31,6 +32,33 @@ const ScrollRestoration = enum { auto, manual };
 
 _frame: *Frame,
 _scroll_restoration: ScrollRestoration = .auto,
+_rate_limit: StateRateLimit = .{},
+
+// Chromium allows 200 navigation updates per 10 seconds, per frame. This
+// limiter covers the two classic History API state mutations only.
+const StateRateLimit = struct {
+    count: u16 = 0,
+    first_ms: u64 = 0,
+
+    fn allow(self: *StateRateLimit, now: u64) bool {
+        if (self.count == 0) self.first_ms = now;
+        if (self.count < 200) {
+            self.count += 1;
+            return true;
+        }
+        if (now -| self.first_ms > 10_000) {
+            self.first_ms = now;
+            self.count = 1;
+            return true;
+        }
+        return false;
+    }
+};
+
+fn allowStateUpdate(self: *History) bool {
+    if (self._frame._session.browser.app.config.historyRateLimitDisabled()) return true;
+    return self._rate_limit.allow(lp.datetime.milliTimestamp(.boot));
+}
 
 pub fn getLength(self: *const History) u32 {
     const target = self._frame;
@@ -81,6 +109,7 @@ pub fn pushState(self: *History, state: js.Value, _: ?[]const u8, _url: ?[]const
     const url = try resolveHistoryUrl(target, _url);
 
     const json = try Navigation.serializeState(state, arena.allocator());
+    if (!self.allowStateUpdate()) return;
 
     const navigation = session.navigationFor(target);
     const result = try navigation.fireNavigateEvent(.{ .navigation_type = .push, .url = url, .same_document = true, .classic_history = true }, target);
@@ -114,6 +143,7 @@ fn replaceState(self: *History, state: js.Value, _: ?[]const u8, _url: ?[]const 
     const url = try resolveHistoryUrl(target, _url);
 
     const json = try Navigation.serializeState(state, arena.allocator());
+    if (!self.allowStateUpdate()) return;
 
     const navigation = session.navigationFor(target);
     const result = try navigation.fireNavigateEvent(.{ .navigation_type = .replace, .url = url, .same_document = true, .classic_history = true }, target);
@@ -220,4 +250,12 @@ test "WebApi: History" {
     try testing.htmlRunner("history_url_update.html", .{});
     try testing.htmlRunner("history_traverse.html", .{});
     try testing.htmlRunner("history_state.html", .{});
+}
+
+test "History: shared state update rate limit resets after ten seconds" {
+    var limit: StateRateLimit = .{};
+    for (0..200) |_| try std.testing.expect(limit.allow(1000));
+    try std.testing.expect(!limit.allow(1000));
+    try std.testing.expect(!limit.allow(11_000));
+    try std.testing.expect(limit.allow(11_001));
 }
