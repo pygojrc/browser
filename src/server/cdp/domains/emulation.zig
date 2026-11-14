@@ -429,6 +429,7 @@ test "cdp.Emulation: setUserAgentOverride acceptLanguage drives navigator.langua
     });
     try ctx.expectSentResult(null, .{ .id = 2 });
     try expectJs(frame, "navigator.language === 'fr-FR' && navigator.languages.length === 1");
+    try expectJs(frame, "navigator.userAgent === 'Mozilla/5.0' && navigator.appVersion === '5.0'");
     try std.testing.expectEqualStrings("Mozilla/5.0", ctx.cdp().browser.http_client.getUserAgent());
 
     try ctx.processMessage(.{

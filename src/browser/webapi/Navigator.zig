@@ -80,7 +80,11 @@ pub fn getAppCodeName(_: *const Navigator) []const u8 {
     return "Mozilla";
 }
 
-pub fn getAppVersion(_: *const Navigator) []const u8 {
+pub fn getAppVersion(self: *const Navigator, exec: *const Execution) []const u8 {
+    const ua = self.getUserAgent(exec);
+    if (std.mem.startsWith(u8, ua, "Mozilla/")) {
+        return ua["Mozilla/".len..];
+    }
     return switch (builtin.target.os.tag) {
         .macos => "5.0 (Macintosh)",
         .windows => "5.0 (Windows)",

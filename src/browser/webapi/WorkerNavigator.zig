@@ -60,8 +60,8 @@ fn getAppCodeName(_: *const WorkerNavigator) []const u8 {
     return Navigator.getAppCodeName(&Navigator.init);
 }
 
-fn getAppVersion(_: *const WorkerNavigator) []const u8 {
-    return Navigator.getAppVersion(&Navigator.init);
+fn getAppVersion(_: *const WorkerNavigator, exec: *const Execution) []const u8 {
+    return Navigator.getAppVersion(&Navigator.init, exec);
 }
 
 fn getLanguage(_: *const WorkerNavigator, exec: *const Execution) []const u8 {
