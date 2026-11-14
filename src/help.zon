@@ -642,6 +642,8 @@
     \\          Suffix appended to the selected default User-Agent.
     \\  --disable-chrome-identity
     \\          Restore the original Lightpanda UA and Client Hints identity.
+    \\  --disable-history-rate-limit
+    \\          Allow unrestricted history.pushState and history.replaceState updates.
     \\  --v8-flags-unsafe <FLAGS>
     \\          Flags passed as-is to the V8 JavaScript engine, space-separated.
     \\          e.g. --v8-flags-unsafe "--expose-gc --stack-size 1000".
