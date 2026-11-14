@@ -45,6 +45,25 @@ jobs:
           zig-out/bin/lightpanda version --check
           zig-out/bin/lightpanda --help
           sha256sum zig-out/bin/lightpanda > zig-out/bin/lightpanda.sha256
+      - name: Capture public detector baseline
+        run: |
+          mkdir -p detector-baseline
+          zig-out/bin/lightpanda version > detector-baseline/version.txt
+          for entry in 'sannysoft https://bot.sannysoft.com/' 'rebrowser https://bot-detector.rebrowser.net/' 'botstop https://botstop.io/'; do
+            name=${entry%% *}
+            url=${entry#* }
+            set +e
+            timeout 45s zig-out/bin/lightpanda fetch --dump markdown --wait-ms 12000 --log-level error "$url" > "detector-baseline/$name.md" 2> "detector-baseline/$name.log"
+            result=$?
+            set -e
+            printf 'exit=%s\n' "$result" > "detector-baseline/$name.status"
+          done
+      - name: Upload detector baseline
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: detector-baseline-${{ github.sha }}
+          path: detector-baseline/
+          if-no-files-found: error
       - name: Upload Linux x86_64 binary
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
