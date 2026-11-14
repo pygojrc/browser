@@ -37,8 +37,8 @@ jobs:
       - uses: ./.github/actions/install
       - name: Build release with snapshot
         run: |
-          zig build -j4 -Dprebuilt_v8_path=v8/libc_v8.a -Doptimize=fast snapshot_creator -- src/snapshot.bin
-          zig build -j4 -Dprebuilt_v8_path=v8/libc_v8.a -Doptimize=fast -Dsnapshot_path=../../snapshot.bin
+          zig build -j4 -Dcpu=x86_64 -Dprebuilt_v8_path=v8/libc_v8.a -Doptimize=fast snapshot_creator -- src/snapshot.bin
+          zig build -j4 -Dcpu=x86_64 -Dprebuilt_v8_path=v8/libc_v8.a -Doptimize=fast -Dsnapshot_path=../../snapshot.bin
       - name: Smoke test and checksum
         run: |
           zig-out/bin/lightpanda version
